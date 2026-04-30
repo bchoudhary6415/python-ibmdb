@@ -11,21 +11,12 @@ import glob
 import subprocess
 import platform
 
-if sys.version_info >= (3,):
-    from urllib import request
-    from io import BytesIO
-else:
-    import urllib2 as request
-    from cStringIO import StringIO as BytesIO
+from urllib import request
+from io import BytesIO
 
-if sys.version_info.major == 3 and sys.version_info.minor >= 12:
-    from setuptools._distutils import ccompiler
-    from setuptools._distutils import sysconfig as distutils_sysconfig
-    from setuptools._distutils.sysconfig import get_python_lib
-else:
-    from distutils import ccompiler
-    from distutils import sysconfig as distutils_sysconfig
-    from distutils.sysconfig import get_python_lib
+from setuptools._distutils import ccompiler
+from setuptools._distutils import sysconfig as distutils_sysconfig
+from setuptools._distutils.sysconfig import get_python_lib
 from setuptools import setup, find_packages, Extension
 from setuptools.command.build_ext import build_ext
 from setuptools.command.build_py import build_py
@@ -140,8 +131,7 @@ def _compiler_include_dirs():
             continue
         yield _linker_arg.lstrip("-I ")
 
-if sys.version_info >= (3, ):      
-    _getinstalledDb2Path()
+_getinstalledDb2Path()
 
 if ('IBM_DB_HOME' in os.environ):
     ibm_db_home = os.getenv('IBM_DB_HOME')
@@ -243,11 +233,6 @@ def _downloadClidriver(url):
     context = ssl._create_unverified_context()
     file_stream = BytesIO(request.urlopen(url, context=context).read())
     if (os_ == 'win'):
-        if sys.version_info[0:2] <= (2, 5):
-            sys.stdout.write("Auto installation of clidriver for Python Version %i.%i on Window platform is currently not supported \n" % (sys.version_info[0:2]))
-            sys.stdout.write("Environment variable IBM_DB_HOME is not set. Set it to your DB2/IBM_Data_Server_Driver installation directory and retry ibm_db module install.\n")
-            sys.stdout.flush()
-            sys.exit(1)
         cliDriver_zip =  zipfile.ZipFile(file_stream)
         cliDriver_zip.extractall()
     else:
@@ -404,8 +389,7 @@ if ((ibm_db_home == '') and (ibm_db_dir == '') and (ibm_db_lib == '')):
 
     if prebuildIbmdbPYD:
         _setWinEnv("PATH", "clidriver")
-        if (sys.version_info >= (3, 8,)):
-            _setDllPath()
+        _setDllPath()
 
     license_agreement = '''\n****************************************\nYou are downloading a package which includes the Python module for IBM DB2/Informix.  The module is licensed under the Apache License 2.0. The package also includes IBM ODBC and CLI Driver from IBM, which is automatically downloaded as the python module is installed on your system/device. The license agreement to the IBM ODBC and CLI Driver is available in %s or %s.   Check for additional dependencies, which may come with their own license agreement(s). Your use of the components of the package and dependencies constitutes your acceptance of their respective license agreements. If you do not accept the terms of any license agreement(s), then delete the relevant component(s) from your device.\n****************************************\n''' % (pip_cli_path, easy_cli_path)
 else:
@@ -521,10 +505,9 @@ else:
     ext_modules = _ext_modules(ibm_db_include, library, ibm_db_lib, ibm_db_lib_runtime)
         
 if('win32' not in sys.platform):
-    if sys.version_info >= (3, ):        
-        if (sys.platform != 'zos'):
-           _checkGcc()
-           _checkPythonHeaderFile()
+    if (sys.platform != 'zos'):
+        _checkGcc()
+        _checkPythonHeaderFile()
 
 # Custom build_py to include ibm_db_dll.pth at the wheel root
 # so it lands in site-packages and triggers DLL registration on startup.
@@ -559,14 +542,15 @@ setup( name    = PACKAGE,
                     'Operating System :: MacOS',
                     'Operating System :: MacOS :: MacOS X',
                     'Programming Language :: Python',
-                    'Programming Language :: Python :: 3.9',
                     'Programming Language :: Python :: 3.10',
                     'Programming Language :: Python :: 3.11',
                     'Programming Language :: Python :: 3.12',
                     'Programming Language :: Python :: 3.13',
                     'Programming Language :: Python :: 3.14',
+                    'Programming Language :: Python :: 3.15',
                     'Topic :: Database :: Front-Ends'],
 
+    python_requires = '>=3.10',
     long_description = open(readme).read(),
     long_description_content_type = 'text/markdown',
     platforms = 'Linux32/64, Win32/64, MacOS64, MacARM64, aix32/64, ppc32/64, sunamd32/64, sun32/64, ppc64le, z/OS',

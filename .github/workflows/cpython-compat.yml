@@ -1,0 +1,172 @@
+name: Auto CPython Compatibility Check
+
+# Trigger: weekly check + manual trigger
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday at 9 AM UTC
+  workflow_dispatch:
+    inputs:
+      min_python:
+        description: 'Minimum Python version'
+        required: false
+        default: '3.10'
+      max_python:
+        description: 'Maximum Python version (or "latest" to auto-detect)'
+        required: false
+        default: 'latest'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  check-new-python:
+    runs-on: ubuntu-latest
+    outputs:
+      new_version: ${{ steps.detect.outputs.new_version }}
+      should_run: ${{ steps.detect.outputs.should_run }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Detect latest Python version
+        id: detect
+        run: |
+          # Get latest stable Python version from python.org
+          LATEST=$(curl -s https://endoflife.date/api/python.json | \
+            python3 -c "import sys,json; versions=json.load(sys.stdin); print(versions[0]['latest'])")
+          echo "Latest Python: $LATEST"
+          
+          # Check if we already have a branch/PR for this version
+          MAJOR_MINOR=$(echo $LATEST | cut -d. -f1,2)
+          BRANCH_NAME="cpython-compat-py${{ github.event.inputs.min_python || '3.9' }}-${MAJOR_MINOR}-support"
+          
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "Branch $BRANCH_NAME already exists. Skipping."
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          else
+            echo "New version detected: $MAJOR_MINOR"
+            echo "new_version=$MAJOR_MINOR" >> $GITHUB_OUTPUT
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          fi
+
+  scan-and-fix:
+    needs: check-new-python
+    if: needs.check-new-python.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14', '3.15']
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          allow-prereleases: true
+
+      - name: Install build dependencies
+        run: pip install build setuptools wheel
+
+      - name: Try building with Python ${{ matrix.python-version }}
+        id: build
+        continue-on-error: true
+        run: |
+          python -m build 2>&1 | tee build_output_${{ matrix.python-version }}.txt
+          echo "exit_code=$?" >> $GITHUB_OUTPUT
+
+      - name: Upload build results
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-result-${{ matrix.python-version }}
+          path: build_output_${{ matrix.python-version }}.txt
+
+  create-compatibility-pr:
+    needs: [check-new-python, scan-and-fix]
+    if: needs.check-new-python.outputs.should_run == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Download all build results
+        uses: actions/download-artifact@v4
+
+      - name: Analyze build failures
+        id: analyze
+        run: |
+          echo "=== Build Results Analysis ===" > analysis_report.txt
+          FAILURES=0
+          for dir in build-result-*/; do
+            VERSION=$(echo $dir | sed 's/build-result-//;s/\///')
+            FILE="$dir/build_output_${VERSION}.txt"
+            if [ -f "$FILE" ]; then
+              if grep -q "error:" "$FILE" 2>/dev/null; then
+                echo "❌ Python $VERSION: BUILD FAILED" >> analysis_report.txt
+                echo "   Errors:" >> analysis_report.txt
+                grep "error:" "$FILE" | head -20 >> analysis_report.txt
+                FAILURES=$((FAILURES + 1))
+              else
+                echo "✅ Python $VERSION: BUILD OK" >> analysis_report.txt
+              fi
+            fi
+          done
+          
+          echo "failures=$FAILURES" >> $GITHUB_OUTPUT
+          cat analysis_report.txt
+
+      - name: Run CPython API scanner
+        run: python .github/scripts/scan_cpython_apis.py > scan_report.txt 2>&1
+
+      - name: Create branch and PR
+        if: steps.analyze.outputs.failures > 0
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          NEW_VERSION="${{ needs.check-new-python.outputs.new_version }}"
+          MIN_PY="${{ github.event.inputs.min_python || '3.9' }}"
+          BRANCH="cpython-compat-py${MIN_PY}-${NEW_VERSION}-support"
+          
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$BRANCH"
+          
+          # Add scan report and analysis
+          mkdir -p .github/compatibility-reports
+          cp analysis_report.txt .github/compatibility-reports/
+          cp scan_report.txt .github/compatibility-reports/
+          
+          git add .github/compatibility-reports/
+          git commit -m "Add CPython API compatibility report for Python ${MIN_PY}–${NEW_VERSION}"
+          git push origin "$BRANCH"
+          
+          # Create PR
+          gh pr create \
+            --title "CPython API compatibility: Python ${MIN_PY}–${NEW_VERSION}" \
+            --body "## Auto-detected Compatibility Issues
+
+          A new Python version (${NEW_VERSION}) was detected. Build tests found compatibility issues.
+
+          ### Build Results
+          $(cat analysis_report.txt)
+
+          ### CPython API Scan
+          $(cat scan_report.txt)
+
+          ### Next Steps
+          1. Review the scan report above
+          2. Open Copilot Agent Mode in VS Code
+          3. Ask: \`Read .github/copilot-instructions.md and execute Steps 2-6 for Python ${MIN_PY}–${NEW_VERSION}\`
+          4. Review and merge
+
+          _This PR was auto-created by the CPython compatibility workflow._" \
+            --label "compatibility,automated"
+
+      - name: No issues found
+        if: steps.analyze.outputs.failures == 0
+        run: echo "✅ All Python versions build successfully. No action needed."
+

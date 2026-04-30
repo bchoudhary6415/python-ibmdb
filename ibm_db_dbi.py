@@ -65,25 +65,12 @@ def LogMsg(log_level, message):
         elif log_level == EXCEPTION:
             logger.exception(message)
 
-PY2 = sys.version_info < (3, )
+buffer = memoryview
 
-if not PY2:
-    buffer = memoryview
-if PY2:
-    import exceptions
+exception = Exception
 
-    exception = exceptions.Exception
-else:
-    exception = Exception
-
-if PY2:
-    import __builtin__
-
-    string_types = __builtin__.unicode, bytes
-    int_types = __builtin__.long, int
-else:
-    string_types = str
-    int_types = int
+string_types = str
+int_types = int
 
 import ibm_db
 
@@ -301,13 +288,7 @@ class DBAPITypeObject(frozenset):
         """
         if cmp in self.col_types:
             return 0
-        if sys.version_info < (3,):
-            if cmp < self.col_types:
-                return 1
-            else:
-                return -1
-        else:
-            return 1
+        return 1
 
     def __eq__(self, cmp):
         """This method checks if the string compared with is in the
@@ -1433,9 +1414,6 @@ class Cursor(object):
         if row == None:
             raise StopIteration
         return row
-
-    if PY2:
-        next = __next__
 
     # This attribute specifies the number of rows the last executeXXX()
     # produced or affected.  It is a read only attribute.

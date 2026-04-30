@@ -8,10 +8,7 @@ import platform
 
 import ibm_db
 import config
-if sys.version_info >= (3, ):
-    from io import StringIO
-else:
-    from cStringIO import StringIO
+from io import StringIO
 
 
 class IbmDbTestFunctions(unittest.TestCase):
@@ -144,10 +141,7 @@ class IbmDbTestFunctions(unittest.TestCase):
                 pattern = re.sub(chr, '\\' + chr, pattern)
 
             pattern = re.sub('%s', '.*?', pattern)
-            if sys.version_info >=(3,7 ):
-                pattern = re.sub('%d', r'\\d+', pattern)
-            else:
-                pattern = re.sub('%d', '\\d+', pattern)
+            pattern = re.sub('%d', r'\\d+', pattern)
 
             result = re.match(pattern, self.capture(testFuncName))
             self.assertNotEqual(result, None)

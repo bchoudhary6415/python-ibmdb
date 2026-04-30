@@ -200,10 +200,10 @@ static PyTypeObject conn_handleType = {
     /* tp_basicsize      */ sizeof(conn_handle),
     /* tp_itemsize       */ 0,
     /* tp_dealloc        */ (destructor)_python_ibm_db_free_conn_struct,
-    /* tp_print          */ 0,
+    /* tp_vectorcall_offset */ 0,
     /* tp_getattr        */ 0,
     /* tp_setattr        */ 0,
-    /* tp_compare        */ 0,
+    /* tp_as_async       */ 0,
     /* tp_repr           */ 0,
     /* tp_as_number      */ 0,
     /* tp_as_sequence    */ 0,
@@ -301,10 +301,10 @@ static PyTypeObject stmt_handleType = {
     /* tp_basicsize      */ sizeof(stmt_handle),
     /* tp_itemsize       */ 0,
     /* tp_dealloc        */ (destructor)_python_ibm_db_free_stmt_struct,
-    /* tp_print          */ 0,
+    /* tp_vectorcall_offset */ 0,
     /* tp_getattr        */ 0,
     /* tp_setattr        */ 0,
-    /* tp_compare        */ 0,
+    /* tp_as_async       */ 0,
     /* tp_repr           */ 0,
     /* tp_as_number      */ 0,
     /* tp_as_sequence    */ 0,
@@ -7908,9 +7908,6 @@ static int _python_ibm_db_bind_data(stmt_handle *stmt_res, param_node *curr, PyO
     SQLWCHAR *dest_uvalue = NULL;
     char *tmp_svalue = NULL;
     char *dest_svalue = NULL;
-#if PY_MAJOR_VERSION < 3
-    Py_ssize_t buffer_len = 0;
-#endif
     int param_length;
     int type = PYTHON_NIL;
     PyObject *item;
@@ -8013,9 +8010,7 @@ static int _python_ibm_db_bind_data(stmt_handle *stmt_res, param_node *curr, PyO
         /* BIGINT_IS_SHORTER_THAN_LONG: Avoid SQLCODE=22005: In xlc with -q64, the size of BIGINT is the same as the size of long */
         if (BIGINT_IS_SHORTER_THAN_LONG && (curr->data_type == SQL_BIGINT || curr->data_type == SQL_DECIMAL))
         {
-#if PY_MAJOR_VERSION >= 3
             PyObject *tempobj2 = NULL;
-#endif
             PyObject *tempobj = NULL;
             if (TYPE(bind_data) == PYTHON_LIST)
             {
@@ -8038,11 +8033,9 @@ static int _python_ibm_db_bind_data(stmt_handle *stmt_res, param_node *curr, PyO
                     else
                     {
                         item = PyObject_Str(item);
-#if PY_MAJOR_VERSION >= 3
                         tempobj2 = PyUnicode_AsASCIIString(item);
                         Py_XDECREF(item);
                         item = tempobj2;
-#endif
                         svalue = PyBytes_AsString(item);
                         curr->ivalue = strlen(svalue);
                         memcpy(curr->svalue + (i * MAX_PRECISION), svalue, curr->ivalue);
@@ -8078,15 +8071,11 @@ static int _python_ibm_db_bind_data(stmt_handle *stmt_res, param_node *curr, PyO
             }
             else
             {
-#if PY_MAJOR_VERSION >= 3
                 PyObject *tempobj2 = NULL;
-#endif
                 tempobj = PyObject_Str(bind_data);
-#if PY_MAJOR_VERSION >= 3
                 tempobj2 = PyUnicode_AsASCIIString(tempobj);
                 Py_XDECREF(tempobj);
                 tempobj = tempobj2;
-#endif
                 curr->svalue = PyBytes_AsString(tempobj);
                 curr->ivalue = strlen(curr->svalue);
                 size_t alloc_size = (curr->param_size > curr->ivalue) ? curr->param_size : curr->ivalue;
@@ -8471,15 +8460,10 @@ static int _python_ibm_db_bind_data(stmt_handle *stmt_res, param_node *curr, PyO
                                                        curr->data_type == SQL_BINARY ||
                                                        curr->data_type == SQL_VARBINARY))
                     {
-#if PY_MAJOR_VERSION >= 3
                         Py_buffer tmp_buffer;
                         PyObject_GetBuffer(item, &tmp_buffer, PyBUF_SIMPLE);
                         tmp_uvalue = tmp_buffer.buf;
                         curr->ivalue = tmp_buffer.len;
-#else
-                        PyObject_AsReadBuffer(item, (const void **)&tmp_uvalue, &buffer_len);
-                        curr->ivalue = buffer_len;
-#endif
                         snprintf(messageStr, sizeof(messageStr), "Buffer check: tmp_uvalue=%p, buffer length=%d", (void *)tmp_uvalue, curr->ivalue);
                         LogMsg(DEBUG, messageStr);
                     }
@@ -8775,19 +8759,12 @@ static int _python_ibm_db_bind_data(stmt_handle *stmt_res, param_node *curr, PyO
             LogMsg(DEBUG, messageStr);
             if (PyObject_CheckBuffer(bind_data) && (curr->data_type == SQL_BLOB || curr->data_type == SQL_BINARY || curr->data_type == SQL_VARBINARY))
             {
-#if PY_MAJOR_VERSION >= 3
                 Py_buffer tmp_buffer;
                 PyObject_GetBuffer(bind_data, &tmp_buffer, PyBUF_SIMPLE);
                 curr->uvalue = tmp_buffer.buf;
                 curr->ivalue = tmp_buffer.len;
                 snprintf(messageStr, sizeof(messageStr), "buffer: uvalue=%p, ivalue=%d", (void *)curr->uvalue, curr->ivalue);
                 LogMsg(DEBUG, messageStr);
-#else
-                PyObject_AsReadBuffer(bind_data, (const void **)&(curr->uvalue), &buffer_len);
-                curr->ivalue = buffer_len;
-                snprintf(messageStr, sizeof(messageStr), "Python 2 buffer: uvalue=%p, ivalue=%d", (void *)curr->uvalue, curr->ivalue);
-                LogMsg(DEBUG, messageStr);
-#endif
             }
             else if (PyUnicode_Check(bind_data) && (curr->data_type == SQL_BLOB || curr->data_type == SQL_BINARY || curr->data_type == SQL_VARBINARY
 #ifndef PASE
@@ -9097,19 +9074,14 @@ static int _python_ibm_db_bind_data(stmt_handle *stmt_res, param_node *curr, PyO
                                                        curr->data_type == SQL_BINARY ||
                                                        curr->data_type == SQL_VARBINARY))
                     {
-#if PY_MAJOR_VERSION >= 3
                         Py_buffer tmp_buffer;
                         PyObject_GetBuffer(item, &tmp_buffer, PyBUF_SIMPLE);
                         tmp_svalue = tmp_buffer.buf;
                         curr->ivalue = tmp_buffer.len;
-#else
-                        PyObject_AsReadBuffer(item, (const void **)&tmp_svalue, &buffer_len);
-                        curr->ivalue = buffer_len;
-#endif
                     }
                     else
                     {
-                        tmp_svalue = PyBytes_AsString(item); /** It is PyString_AsString() in PY_MAJOR_VERSION<3, and code execution will not come here in PY_MAJOR_VERSION>=3 **/
+                        tmp_svalue = PyBytes_AsString(item);
                         curr->ivalue = strlen(tmp_svalue);
                     }
                     param_length = curr->ivalue;
@@ -9317,15 +9289,10 @@ static int _python_ibm_db_bind_data(stmt_handle *stmt_res, param_node *curr, PyO
                                                     curr->data_type == SQL_BINARY ||
                                                     curr->data_type == SQL_VARBINARY))
             {
-#if PY_MAJOR_VERSION >= 3
                 Py_buffer tmp_buffer;
                 PyObject_GetBuffer(bind_data, &tmp_buffer, PyBUF_SIMPLE);
                 curr->svalue = tmp_buffer.buf;
                 curr->ivalue = tmp_buffer.len;
-#else
-                PyObject_AsReadBuffer(bind_data, (const void **)&(curr->svalue), &buffer_len);
-                curr->ivalue = buffer_len;
-#endif
             }
             else
             {
@@ -9334,7 +9301,7 @@ static int _python_ibm_db_bind_data(stmt_handle *stmt_res, param_node *curr, PyO
                     PyMem_Del(curr->svalue);
                     curr->svalue = NULL;
                 }
-                curr->svalue = PyBytes_AsString(bind_data); /** It is PyString_AsString() in PY_MAJOR_VERSION<3, and code execution will not come here in PY_MAJOR_VERSION>=3 **/
+                curr->svalue = PyBytes_AsString(bind_data);
                 curr->ivalue = strlen(curr->svalue);
             }
             param_length = curr->ivalue;
@@ -9546,9 +9513,7 @@ static int _python_ibm_db_bind_data(stmt_handle *stmt_res, param_node *curr, PyO
                 for (i = 0; i < n; i++)
                 {
                     PyObject *tempobj = NULL;
-#if PY_MAJOR_VERSION >= 3
                     PyObject *tempobj2 = NULL;
-#endif
                     item = PyList_GetItem(bind_data, i);
                     snprintf(messageStr, sizeof(messageStr), "Processing list item index %d, item pointer: %p", i, (void *)item);
                     LogMsg(DEBUG, messageStr);
@@ -9561,11 +9526,9 @@ static int _python_ibm_db_bind_data(stmt_handle *stmt_res, param_node *curr, PyO
                     else
                     {
                         tempobj = PyObject_Str(item);
-#if PY_MAJOR_VERSION >= 3
                         tempobj2 = PyUnicode_AsASCIIString(tempobj);
                         Py_XDECREF(tempobj);
                         tempobj = tempobj2;
-#endif
                         svalue = PyBytes_AsString(tempobj);
                         curr->ivalue = strlen(svalue);
                         memcpy(curr->svalue + (i * max_precn), svalue, curr->ivalue);
@@ -9609,20 +9572,16 @@ static int _python_ibm_db_bind_data(stmt_handle *stmt_res, param_node *curr, PyO
             else /* To bind scalar values */
             {
                 PyObject *tempobj = NULL;
-#if PY_MAJOR_VERSION >= 3
                 PyObject *tempobj2 = NULL;
-#endif
                 if (curr->svalue != NULL)
                 {
                     PyMem_Del(curr->svalue);
                     curr->svalue = NULL;
                 }
                 tempobj = PyObject_Str(bind_data);
-#if PY_MAJOR_VERSION >= 3
                 tempobj2 = PyUnicode_AsASCIIString(tempobj);
                 Py_XDECREF(tempobj);
                 tempobj = tempobj2;
-#endif
                 curr->svalue = PyBytes_AsString(tempobj);
                 curr->ivalue = strlen(curr->svalue);
 
@@ -9931,11 +9890,7 @@ static int _python_ibm_db_bind_data(stmt_handle *stmt_res, param_node *curr, PyO
                     ts->second = PyDateTime_DATE_GET_SECOND(item);
                     ts->fraction = PyDateTime_DATE_GET_MICROSECOND(item) * 1000;
                     curr->bind_indicator_array[i] = SQL_NTS;
-#if PY_VERSION_HEX >= 0x030A0000  /* Python 3.10+ */
                     PyObject *tzinfo = PyDateTime_DATE_GET_TZINFO(item);
-#else
-                    PyObject *tzinfo = NULL;  /* Not available in Python < 3.10 */
-#endif
                     snprintf(messageStr, sizeof(messageStr), "tzinfo pointer: %p", (void *)tzinfo);
                     LogMsg(DEBUG, messageStr);
 
@@ -10025,11 +9980,7 @@ static int _python_ibm_db_bind_data(stmt_handle *stmt_res, param_node *curr, PyO
         PyObject *result = NULL;
         double total_seconds;
 
-#if PY_VERSION_HEX >= 0x030A0000  /* Python 3.10+ */
         PyObject* tzinfo = PyDateTime_DATE_GET_TZINFO(bind_data);
-#else
-        PyObject* tzinfo = NULL;  /* Not supported in Python < 3.10 */
-#endif
 
         if (!tzinfo || tzinfo == Py_None) {
             LogMsg(EXCEPTION, "No tzinfo provided on datetime object");
@@ -11891,9 +11842,7 @@ static PyObject *ibm_db_field_name(PyObject *self, PyObject *args)
     LogUTF8Msg(args);
     PyObject *column = NULL;
     PyObject *result = NULL;
-#if PY_MAJOR_VERSION >= 3
     PyObject *col_name_py3_tmp = NULL;
-#endif
     PyObject *py_stmt_res = NULL;
     stmt_handle *stmt_res = NULL;
     char *col_name = NULL;
@@ -11927,7 +11876,6 @@ static PyObject *ibm_db_field_name(PyObject *self, PyObject *args)
     }
     else if (PyString_Check(column))
     {
-#if PY_MAJOR_VERSION >= 3
         col_name_py3_tmp = PyUnicode_AsASCIIString(column);
         if (col_name_py3_tmp == NULL)
         {
@@ -11935,7 +11883,6 @@ static PyObject *ibm_db_field_name(PyObject *self, PyObject *args)
             return NULL;
         }
         column = col_name_py3_tmp;
-#endif
         col_name = PyBytes_AsString(column);
         snprintf(messageStr, sizeof(messageStr), "Column name is a string: %s", col_name);
         LogMsg(DEBUG, messageStr);
@@ -11948,12 +11895,10 @@ static PyObject *ibm_db_field_name(PyObject *self, PyObject *args)
         Py_RETURN_FALSE;
     }
     col = _python_ibm_db_get_column_by_name(stmt_res, col_name, col);
-#if PY_MAJOR_VERSION >= 3
     if (col_name_py3_tmp != NULL)
     {
         Py_XDECREF(col_name_py3_tmp);
     }
-#endif
     if (col < 0)
     {
         LogMsg(DEBUG, "Column index not found");
@@ -11969,11 +11914,7 @@ static PyObject *ibm_db_field_name(PyObject *self, PyObject *args)
     if (result)
     {
         const char *result_str = NULL;
-#if PY_MAJOR_VERSION >= 3
         result_str = PyUnicode_AsUTF8(result);
-#else
-        result_str = PyString_AsString(result);
-#endif
 
         if (result_str)
         {
@@ -12028,9 +11969,7 @@ static PyObject *ibm_db_field_display_size(PyObject *self, PyObject *args)
     LogUTF8Msg(args);
     PyObject *py_stmt_res = NULL;
     PyObject *column = NULL;
-#if PY_MAJOR_VERSION >= 3
     PyObject *col_name_py3_tmp = NULL;
-#endif
     int col = -1;
     char *col_name = NULL;
     stmt_handle *stmt_res = NULL;
@@ -12065,7 +12004,6 @@ static PyObject *ibm_db_field_display_size(PyObject *self, PyObject *args)
     }
     else if (PyString_Check(column))
     {
-#if PY_MAJOR_VERSION >= 3
         col_name_py3_tmp = PyUnicode_AsASCIIString(column);
         if (col_name_py3_tmp == NULL)
         {
@@ -12075,7 +12013,6 @@ static PyObject *ibm_db_field_display_size(PyObject *self, PyObject *args)
         column = col_name_py3_tmp;
         snprintf(messageStr, sizeof(messageStr), "Converted column to ASCII: %s", PyBytes_AsString(column));
         LogMsg(DEBUG, messageStr);
-#endif
         col_name = PyBytes_AsString(column);
         snprintf(messageStr, sizeof(messageStr), "Column is a string: col_name=%s", col_name);
         LogMsg(DEBUG, messageStr);
@@ -12090,13 +12027,11 @@ static PyObject *ibm_db_field_display_size(PyObject *self, PyObject *args)
     col = _python_ibm_db_get_column_by_name(stmt_res, col_name, col);
     snprintf(messageStr, sizeof(messageStr), "Column index after _python_ibm_db_get_column_by_name: %d", col);
     LogMsg(DEBUG, messageStr);
-#if PY_MAJOR_VERSION >= 3
     if (col_name_py3_tmp != NULL)
     {
         Py_XDECREF(col_name_py3_tmp);
         LogMsg(DEBUG, "Cleaned up col_name_py3_tmp");
     }
-#endif
     if (col < 0)
     {
         LogMsg(ERROR, "Invalid column index");
@@ -12153,9 +12088,7 @@ static PyObject *ibm_db_field_nullable(PyObject *self, PyObject *args)
     LogUTF8Msg(args);
     PyObject *py_stmt_res = NULL;
     PyObject *column = NULL;
-#if PY_MAJOR_VERSION >= 3
     PyObject *col_name_py3_tmp = NULL;
-#endif
     stmt_handle *stmt_res = NULL;
     char *col_name = NULL;
     int col = -1;
@@ -12190,7 +12123,6 @@ static PyObject *ibm_db_field_nullable(PyObject *self, PyObject *args)
     }
     else if (PyString_Check(column))
     {
-#if PY_MAJOR_VERSION >= 3
         col_name_py3_tmp = PyUnicode_AsASCIIString(column);
         if (col_name_py3_tmp == NULL)
         {
@@ -12198,7 +12130,6 @@ static PyObject *ibm_db_field_nullable(PyObject *self, PyObject *args)
             return NULL;
         }
         column = col_name_py3_tmp;
-#endif
         col_name = PyBytes_AsString(column);
         snprintf(messageStr, sizeof(messageStr), "Column name parsed: col_name=%s", col_name);
         LogMsg(DEBUG, messageStr);
@@ -12215,12 +12146,10 @@ static PyObject *ibm_db_field_nullable(PyObject *self, PyObject *args)
     snprintf(messageStr, sizeof(messageStr),
              "_python_ibm_db_get_column_by_name returned: col=%d", col);
     LogMsg(DEBUG, messageStr);
-#if PY_MAJOR_VERSION >= 3
     if (col_name_py3_tmp != NULL)
     {
         Py_XDECREF(col_name_py3_tmp);
     }
-#endif
     if (col < 0)
     {
         LogMsg(INFO, "Invalid column index.");
@@ -12289,9 +12218,7 @@ static PyObject *ibm_db_field_num(PyObject *self, PyObject *args)
     LogUTF8Msg(args);
     PyObject *py_stmt_res = NULL;
     PyObject *column = NULL;
-#if PY_MAJOR_VERSION >= 3
     PyObject *col_name_py3_tmp = NULL;
-#endif
     stmt_handle *stmt_res = NULL;
     char *col_name = NULL;
     int col = -1;
@@ -12324,7 +12251,6 @@ static PyObject *ibm_db_field_num(PyObject *self, PyObject *args)
     }
     else if (PyString_Check(column))
     {
-#if PY_MAJOR_VERSION >= 3
         col_name_py3_tmp = PyUnicode_AsASCIIString(column);
         if (col_name_py3_tmp == NULL)
         {
@@ -12332,7 +12258,6 @@ static PyObject *ibm_db_field_num(PyObject *self, PyObject *args)
             return NULL;
         }
         column = col_name_py3_tmp;
-#endif
         col_name = PyBytes_AsString(column);
         snprintf(messageStr, sizeof(messageStr), "Column name is a string: %s", col_name);
         LogMsg(DEBUG, messageStr);
@@ -12344,12 +12269,10 @@ static PyObject *ibm_db_field_num(PyObject *self, PyObject *args)
         Py_RETURN_FALSE;
     }
     col = _python_ibm_db_get_column_by_name(stmt_res, col_name, col);
-#if PY_MAJOR_VERSION >= 3
     if (col_name_py3_tmp != NULL)
     {
         Py_XDECREF(col_name_py3_tmp);
     }
-#endif
     if (col < 0)
     {
         LogMsg(DEBUG, "Column index not found");
@@ -12392,9 +12315,7 @@ static PyObject *ibm_db_field_precision(PyObject *self, PyObject *args)
     LogUTF8Msg(args);
     PyObject *py_stmt_res = NULL;
     PyObject *column = NULL;
-#if PY_MAJOR_VERSION >= 3
     PyObject *col_name_py3_tmp = NULL;
-#endif
     stmt_handle *stmt_res = NULL;
     char *col_name = NULL;
     int col = -1;
@@ -12427,7 +12348,6 @@ static PyObject *ibm_db_field_precision(PyObject *self, PyObject *args)
     }
     else if (PyString_Check(column))
     {
-#if PY_MAJOR_VERSION >= 3
         col_name_py3_tmp = PyUnicode_AsASCIIString(column);
         if (col_name_py3_tmp == NULL)
         {
@@ -12435,7 +12355,6 @@ static PyObject *ibm_db_field_precision(PyObject *self, PyObject *args)
             return NULL;
         }
         column = col_name_py3_tmp;
-#endif
         col_name = PyBytes_AsString(column);
         snprintf(messageStr, sizeof(messageStr), "Column name is a string: %s", col_name);
         LogMsg(DEBUG, messageStr);
@@ -12448,12 +12367,10 @@ static PyObject *ibm_db_field_precision(PyObject *self, PyObject *args)
         Py_RETURN_FALSE;
     }
     col = _python_ibm_db_get_column_by_name(stmt_res, col_name, col);
-#if PY_MAJOR_VERSION >= 3
     if (col_name_py3_tmp != NULL)
     {
         Py_XDECREF(col_name_py3_tmp);
     }
-#endif
     snprintf(messageStr, sizeof(messageStr), "Column index found: %d", col);
     LogMsg(DEBUG, messageStr);
     if (col < 0)
@@ -12496,9 +12413,7 @@ static PyObject *ibm_db_field_scale(PyObject *self, PyObject *args)
     LogUTF8Msg(args);
     PyObject *py_stmt_res = NULL;
     PyObject *column = NULL;
-#if PY_MAJOR_VERSION >= 3
     PyObject *col_name_py3_tmp = NULL;
-#endif
     stmt_handle *stmt_res = NULL;
     char *col_name = NULL;
     int col = -1;
@@ -12530,7 +12445,6 @@ static PyObject *ibm_db_field_scale(PyObject *self, PyObject *args)
     }
     else if (PyString_Check(column))
     {
-#if PY_MAJOR_VERSION >= 3
         col_name_py3_tmp = PyUnicode_AsASCIIString(column);
         if (col_name_py3_tmp == NULL)
         {
@@ -12538,7 +12452,6 @@ static PyObject *ibm_db_field_scale(PyObject *self, PyObject *args)
             return NULL;
         }
         column = col_name_py3_tmp;
-#endif
         col_name = PyBytes_AsString(column);
         snprintf(messageStr, sizeof(messageStr), "Column is a string. col_name=%s", col_name);
         LogMsg(DEBUG, messageStr);
@@ -12552,12 +12465,10 @@ static PyObject *ibm_db_field_scale(PyObject *self, PyObject *args)
     col = _python_ibm_db_get_column_by_name(stmt_res, col_name, col);
     snprintf(messageStr, sizeof(messageStr), "Column index obtained: col=%d", col);
     LogMsg(DEBUG, messageStr);
-#if PY_MAJOR_VERSION >= 3
     if (col_name_py3_tmp != NULL)
     {
         Py_XDECREF(col_name_py3_tmp);
     }
-#endif
     if (col < 0)
     {
         LogMsg(ERROR, "Column index is invalid");
@@ -12599,9 +12510,7 @@ static PyObject *ibm_db_field_type(PyObject *self, PyObject *args)
     LogUTF8Msg(args);
     PyObject *py_stmt_res = NULL;
     PyObject *column = NULL;
-#if PY_MAJOR_VERSION >= 3
     PyObject *col_name_py3_tmp = NULL;
-#endif
     stmt_handle *stmt_res = NULL;
     char *col_name = NULL;
     char *str_val = NULL;
@@ -12634,7 +12543,6 @@ static PyObject *ibm_db_field_type(PyObject *self, PyObject *args)
     }
     else if (PyString_Check(column))
     {
-#if PY_MAJOR_VERSION >= 3
         col_name_py3_tmp = PyUnicode_AsASCIIString(column);
         if (col_name_py3_tmp == NULL)
         {
@@ -12642,7 +12550,6 @@ static PyObject *ibm_db_field_type(PyObject *self, PyObject *args)
             return NULL;
         }
         column = col_name_py3_tmp;
-#endif
         col_name = PyBytes_AsString(column);
         snprintf(messageStr, sizeof(messageStr), "Column is a string: %s", col_name);
         LogMsg(DEBUG, messageStr);
@@ -12654,12 +12561,10 @@ static PyObject *ibm_db_field_type(PyObject *self, PyObject *args)
         Py_RETURN_FALSE;
     }
     col = _python_ibm_db_get_column_by_name(stmt_res, col_name, col);
-#if PY_MAJOR_VERSION >= 3
     if (col_name_py3_tmp != NULL)
     {
         Py_XDECREF(col_name_py3_tmp);
     }
-#endif
     snprintf(messageStr, sizeof(messageStr), "Column index: %d", col);
     LogMsg(DEBUG, messageStr);
     if (col < 0)
@@ -12754,9 +12659,7 @@ static PyObject *ibm_db_field_width(PyObject *self, PyObject *args)
     LogUTF8Msg(args);
     PyObject *py_stmt_res = NULL;
     PyObject *column = NULL;
-#if PY_MAJOR_VERSION >= 3
     PyObject *col_name_py3_tmp = NULL;
-#endif
     int col = -1;
     char *col_name = NULL;
     stmt_handle *stmt_res = NULL;
@@ -12790,7 +12693,6 @@ static PyObject *ibm_db_field_width(PyObject *self, PyObject *args)
     }
     else if (PyString_Check(column))
     {
-#if PY_MAJOR_VERSION >= 3
         col_name_py3_tmp = PyUnicode_AsASCIIString(column);
         if (col_name_py3_tmp == NULL)
         {
@@ -12798,7 +12700,6 @@ static PyObject *ibm_db_field_width(PyObject *self, PyObject *args)
             return NULL;
         }
         column = col_name_py3_tmp;
-#endif
         col_name = PyBytes_AsString(column);
         snprintf(messageStr, sizeof(messageStr), "Column is a string: %s", col_name);
         LogMsg(DEBUG, messageStr);
@@ -12810,12 +12711,10 @@ static PyObject *ibm_db_field_width(PyObject *self, PyObject *args)
         Py_RETURN_FALSE;
     }
     col = _python_ibm_db_get_column_by_name(stmt_res, col_name, col);
-#if PY_MAJOR_VERSION >= 3
     if (col_name_py3_tmp != NULL)
     {
         Py_XDECREF(col_name_py3_tmp);
     }
-#endif
     snprintf(messageStr, sizeof(messageStr), "Column index: %d", col);
     LogMsg(DEBUG, messageStr);
     if (col < 0)
@@ -13106,9 +13005,7 @@ static PyObject *ibm_db_result(PyObject *self, PyObject *args)
     LogUTF8Msg(args);
     PyObject *py_stmt_res = NULL;
     PyObject *column = NULL;
-#if PY_MAJOR_VERSION >= 3
     PyObject *col_name_py3_tmp = NULL;
-#endif
     PyObject *retVal = NULL;
     stmt_handle *stmt_res;
     long col_num;
@@ -13156,7 +13053,6 @@ static PyObject *ibm_db_result(PyObject *self, PyObject *args)
         }
         else if (PyString_Check(column))
         {
-#if PY_MAJOR_VERSION >= 3
             col_name_py3_tmp = PyUnicode_AsASCIIString(column);
             if (col_name_py3_tmp == NULL)
             {
@@ -13164,16 +13060,13 @@ static PyObject *ibm_db_result(PyObject *self, PyObject *args)
                 return NULL;
             }
             column = col_name_py3_tmp;
-#endif
             snprintf(messageStr, sizeof(messageStr), "Column name: %s", PyBytes_AsString(column));
             LogMsg(DEBUG, messageStr);
             col_num = _python_ibm_db_get_column_by_name(stmt_res, PyBytes_AsString(column), -1);
-#if PY_MAJOR_VERSION >= 3
             if (col_name_py3_tmp != NULL)
             {
                 Py_XDECREF(col_name_py3_tmp);
             }
-#endif
         }
         else
         {
@@ -19199,7 +19092,6 @@ static PyMethodDef ibm_db_Methods[] = {
 #define PyMODINIT_FUNC void
 #endif
 
-#if PY_MAJOR_VERSION >= 3
 static struct PyModuleDef moduledef = {
     PyModuleDef_HEAD_INIT,
     "ibm_db",
@@ -19207,7 +19099,6 @@ static struct PyModuleDef moduledef = {
     -1,
     ibm_db_Methods,
 };
-#endif
 
 /* Module initialization function */
 PyMODINIT_FUNC
@@ -19239,14 +19130,10 @@ INIT_ibm_db(void)
     if (PyType_Ready(&server_infoType) < 0)
         return MOD_RETURN_ERROR;
 
-#if PY_MAJOR_VERSION < 3
-    m = Py_InitModule3("ibm_db", ibm_db_Methods, "IBM DataServer Driver for Python.");
-#else
     m = PyModule_Create(&moduledef);
-#endif
 
-    Py_INCREF(&conn_handleType);
-    PyModule_AddObject(m, "IBM_DBConnection", (PyObject *)&conn_handleType);
+    /* PyModule_AddObjectRef (available since 3.10) — no manual Py_INCREF needed */
+    PyModule_AddObjectRef(m, "IBM_DBConnection", (PyObject *)&conn_handleType);
 
     PyModule_AddIntConstant(m, "SQL_AUTOCOMMIT_ON", SQL_AUTOCOMMIT_ON);
     PyModule_AddIntConstant(m, "SQL_AUTOCOMMIT_OFF", SQL_AUTOCOMMIT_OFF);
@@ -19332,14 +19219,11 @@ INIT_ibm_db(void)
 #endif
     PyModule_AddStringConstant(m, "__version__", MODULE_RELEASE);
 
-    Py_INCREF(&stmt_handleType);
-    PyModule_AddObject(m, "IBM_DBStatement", (PyObject *)&stmt_handleType);
+    PyModule_AddObjectRef(m, "IBM_DBStatement", (PyObject *)&stmt_handleType);
 
-    Py_INCREF(&client_infoType);
-    PyModule_AddObject(m, "IBM_DBClientInfo", (PyObject *)&client_infoType);
+    PyModule_AddObjectRef(m, "IBM_DBClientInfo", (PyObject *)&client_infoType);
 
-    Py_INCREF(&server_infoType);
-    PyModule_AddObject(m, "IBM_DBServerInfo", (PyObject *)&server_infoType);
+    PyModule_AddObjectRef(m, "IBM_DBServerInfo", (PyObject *)&server_infoType);
     PyModule_AddIntConstant(m, "SQL_ATTR_QUERY_TIMEOUT", SQL_ATTR_QUERY_TIMEOUT);
     PyModule_AddIntConstant(m, "SQL_ATTR_PARAMSET_SIZE", SQL_ATTR_PARAMSET_SIZE);
     PyModule_AddIntConstant(m, "SQL_ATTR_PARAM_BIND_TYPE", SQL_ATTR_PARAM_BIND_TYPE);

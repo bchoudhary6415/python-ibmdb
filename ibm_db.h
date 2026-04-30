@@ -13,30 +13,23 @@
 #include <stdlib.h>
 #include <sqlcli1.h>
 #include <Python.h>
+
+/* structmember.h is deprecated in Python 3.12+; T_OBJECT_EX replaced by Py_T_OBJECT_EX */
+#if PY_VERSION_HEX < 0x030C0000
 #include <structmember.h>
+#else
+#ifndef T_OBJECT_EX
+#define T_OBJECT_EX Py_T_OBJECT_EX
+#endif
+#endif
 
 /*
- * Combability changes for Python 3
+ * Compatibility macros for Python 3.10+
+ * MIN_PYTHON = 3.10, so Python 2 code has been removed.
  */
 #define LONG_BIT 64
-/* defining string methods */
-#if PY_MAJOR_VERSION < 3
-#define PyBytes_Check PyString_Check
-#define StringOBJ_FromASCII(str) PyString_FromString(str)
-#define StringOBJ_FromASCIIAndSize PyString_FromStringAndSize
-#define StringOBJ_FromStr(str) PyString_FromString(str)
-#define PyBytes_AsString PyString_AsString
-#define PyBytes_FromStringAndSize PyString_FromStringAndSize
-#define StringObj_Format PyString_Format
-#define StringObj_Size PyString_Size
-#define PyObject_CheckBuffer PyObject_CheckReadBuffer
-#define PyVarObject_HEAD_INIT(type, size) \
-    PyObject_HEAD_INIT(type) size,
-#define Py_TYPE(ob) (((PyObject *)(ob))->ob_type)
-#define MOD_RETURN_ERROR
-#define MOD_RETURN_VAL(mod)
-#define INIT_ibm_db initibm_db
-#else
+
+/* String/type compat macros (Python 3 only) */
 #define PyInt_Check PyLong_Check
 #define PyInt_FromLong PyLong_FromLong
 #define PyInt_AsLong PyLong_AsLong
@@ -50,7 +43,6 @@
 #define MOD_RETURN_ERROR NULL
 #define MOD_RETURN_VAL(mod) mod
 #define INIT_ibm_db PyInit_ibm_db
-#endif
 
 #define NUM2LONG(data) PyInt_AsLong(data)
 #define STR2CSTR(data) PyString_AsString(data)
@@ -248,10 +240,10 @@ static PyTypeObject client_infoType = {
     /* tp_basicsize      */ sizeof(le_client_info),
     /* tp_itemsize       */ 0,
     /* tp_dealloc        */ 0,
-    /* tp_print          */ 0,
+    /* tp_vectorcall_offset */ 0,
     /* tp_getattr        */ 0,
     /* tp_setattr        */ 0,
-    /* tp_compare        */ 0,
+    /* tp_as_async       */ 0,
     /* tp_repr           */ 0,
     /* tp_as_number      */ 0,
     /* tp_as_sequence    */ 0,
@@ -339,10 +331,10 @@ static PyTypeObject server_infoType = {
     /* tp_basicsize      */ sizeof(le_server_info),
     /* tp_itemsize       */ 0,
     /* tp_dealloc        */ 0,
-    /* tp_print          */ 0,
+    /* tp_vectorcall_offset */ 0,
     /* tp_getattr        */ 0,
     /* tp_setattr        */ 0,
-    /* tp_compare        */ 0,
+    /* tp_as_async       */ 0,
     /* tp_repr           */ 0,
     /* tp_as_number      */ 0,
     /* tp_as_sequence    */ 0,
@@ -387,13 +379,6 @@ static int _python_get_variable_type(PyObject *variable_value);
 /* Declare _python_ibm_db_set_decfloat_rounding_mode_client() */
 static int _python_ibm_db_set_decfloat_rounding_mode_client(SQLHANDLE hdbc);
 #endif
-#endif
-
-/* For compatibility with python < 2.5 */
-#if PY_VERSION_HEX < 0x02050000 && !defined(PY_SSIZE_T_MIN)
-typedef int Py_ssize_t;
-#define PY_SSIZE_T_MAX INT_MAX
-#define PY_SSIZE_T_MIN INT_MIN
 #endif
 
 #ifdef __MVS__
