@@ -1,3 +1,22 @@
+2026-08-11, Version 3.3.0
+=========================
+
+ * Update default clidriver to v12.1.x for wheel images of ibm_db driver (#1067) (Bimal Kumar Jha)
+
+ * Fix UTF-16 surrogate pair handling for non-BMP strings in parameter binding (#1065) (bchoudhary6415)
+
+ * Add support for two phase commit and fix sparray test result mismatch (#1063) (Earammak)
+
+ * Fix Windows 32-bit wheel build and rename config.py.sample to config.py (#1062) (Earammak)
+
+ * Add asyncio support, cursor enhancements, test runner refactor and documentation (#1060) (Earammak)
+
+ * external clidriver requires recompilation (#1061) (BotBlake)
+
+ * Add SQLFetchScroll rowset-based fetching for fetchall() and fetchmany() APIs (#1059) (bchoudhary6415)
+
+ * fix: update workflow file to skip building free threaded wheels (Bimal Jha)
+
 2026-04-22, Version 3.2.9
 =========================
 
@@ -28,7 +47,6 @@
  * update clone links and install instructions (Bimal Jha)
 
  * Polaris scan fixes (Balram Choudhary)
-
 
 # 2025-12-07, Version 3.2.8
 

@@ -2,7 +2,7 @@
 +--------------------------------------------------------------------------+
 | Licensed Materials - Property of IBM                                     |
 |                                                                          |
-| (C) Copyright IBM Corporation 2006-2020                                 |
+| (C) Copyright IBM Corporation 2006-2026                                 |
 +--------------------------------------------------------------------------+
 | This module complies with SQLAlchemy 0.4 and is                          |
 | Licensed under the Apache License, Version 2.0 (the "License");          |
@@ -18,11 +18,11 @@
 |   Lynh Nguyen, Kanchana Padmanabhan, Dan Scott, Helmut Tessarek,         |
 |   Sam Ruby, Kellen Bombardier, Tony Cairns, Abhigyan Agrawal,            |
 |   Tarun Pasrija, Rahul Priyadarshi, Akshay Anand, Saba Kauser ,          |
-|   Hemlata Bhatt                                                          |
+|   Hemlata Bhatt, Bimal Kumar Jha                                         |
 +--------------------------------------------------------------------------+
 */
 
-#define MODULE_RELEASE "3.2.9"
+#define MODULE_RELEASE "3.3.0"
 
 #include <Python.h>
 #include <datetime.h>
